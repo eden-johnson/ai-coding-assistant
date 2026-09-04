@@ -1,39 +1,66 @@
-"""
-Milestone 1: given a GitHub URL, clone it, find the Python files, print them.
-Run: python main.py https://github.com/user/project
-"""
-
-import sys
+from fastapi import FastAPI
+from pydantic import BaseModel
 
 from ingestion.github import clone_repository, cleanup_repository
 from ingestion.file_loader import scan_repository
 from ingestion.chunker import chunk_files
+from rag.embeddings import get_embeddings, get_embedding
+from rag.vector_store import add_chunks, search
+from rag.llm import generate_answer
+
+app = FastAPI(title="AI Codebase Assistant")
 
 
-def main(repo_url: str) -> None:
-    print(f"Cloning {repo_url} ...")
-    local_path = clone_repository(repo_url)
+def repo_id_from_url(repo_url: str) -> str:
+    owner_repo = repo_url.rstrip("/").split("github.com/")[-1]
+    return owner_repo.replace("/", "-")
+
+
+class IndexRequest(BaseModel):
+    repo_url: str
+
+
+class AskRequest(BaseModel):
+    repo_url: str
+    question: str
+
+
+@app.post("/index")
+def index_repo(req: IndexRequest):
+    repo_id = repo_id_from_url(req.repo_url)
+    local_path = clone_repository(req.repo_url)
 
     try:
-        print("Scanning for Python files ...")
         files = scan_repository(local_path)
-        print(f"Found {len(files)} Python files\n")
-
-        print("Chunking files ...")
         chunks = chunk_files(files)
-        print(f"Created {len(chunks)} chunks\n")
 
-        for c in chunks:
-            print(f"📄 {c['file']}  lines {c['start_line']}-{c['end_line']}")
+        chunk_texts = [c["content"] for c in chunks]
+        chunk_embeddings = get_embeddings(chunk_texts)
 
+        add_chunks(repo_id, chunks, chunk_embeddings)
+
+        return {
+            "repo_id": repo_id,
+            "files_scanned": len(files),
+            "chunks_stored": len(chunks),
+        }
     finally:
-        # Always clean up the temp clone, even if scanning throws an error.
         cleanup_repository(local_path)
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python main.py <github_repo_url>")
-        sys.exit(1)
+@app.post("/ask")
+def ask_question(req: AskRequest):
+    repo_id = repo_id_from_url(req.repo_url)
 
-    main(sys.argv[1])
+    question_embedding = get_embedding(req.question)
+    results = search(repo_id, question_embedding, n_results=3)
+
+    answer = generate_answer(req.question, results)
+
+    return {
+        "answer": answer,
+        "sources": [
+            {"file": r["file"], "start_line": r["start_line"], "end_line": r["end_line"]}
+            for r in results
+        ],
+    }

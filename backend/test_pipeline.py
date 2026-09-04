@@ -1,6 +1,7 @@
 """
-End-to-end test of Stages 1-5: clone a repo, chunk it, embed the chunks
-with OpenAI, store them in ChromaDB, then search with a real question.
+End-to-end test of Stages 1-6: clone a repo, chunk it, embed the chunks
+locally, store them in ChromaDB, search with a real question, then
+generate a grounded answer with Groq.
 
 Run: python test_pipeline.py https://github.com/user/project "your question"
 """
@@ -12,6 +13,7 @@ from ingestion.file_loader import scan_repository
 from ingestion.chunker import chunk_files
 from rag.embeddings import get_embeddings, get_embedding
 from rag.vector_store import add_chunks, search
+from rag.llm import generate_answer
 
 
 def repo_id_from_url(repo_url: str) -> str:
@@ -52,6 +54,10 @@ def main(repo_url: str, question: str) -> None:
         print("\nTop matching chunks:")
         for r in results:
             print(f"  📄 {r['file']}  lines {r['start_line']}-{r['end_line']}  (distance {r['distance']:.4f})")
+
+        print("\nGenerating answer ...")
+        answer = generate_answer(question, results)
+        print(f"\nAnswer:\n{answer}")
 
     finally:
         cleanup_repository(local_path)
