@@ -1,15 +1,15 @@
-# --- already used (Stage 1: clone + scan) ---
-gitpython           # clone GitHub repos locally
+# Ingestion
+gitpython
 
-# --- coming next: chunking + embeddings + vector DB ---
-chromadb             # vector database — stores code embeddings, does similarity search
-tiktoken             # counts tokens so chunks stay under the LLM's context limit
+# Embeddings + vector DB
+sentence-transformers
+chromadb
 
-# --- coming next: RAG answer generation ---
-openai               # embedding model + LLM calls (swap for `anthropic` if you use Claude instead)
-python-dotenv        # loads your API key from a .env file instead of hardcoding it
+# LLM
+groq
+python-dotenv
 
-# --- coming next: FastAPI backend (Stage 7) ---
-fastapi              # web framework — exposes /index and /ask as HTTP endpoints
-uvicorn[standard]    # ASGI server that actually runs FastAPI
-pydantic             # request/response validation (FastAPI uses this under the hood)
+# API server
+fastapi
+uvicorn[standard]
+pydantic

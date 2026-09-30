@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from ingestion.github import clone_repository, cleanup_repository
@@ -9,6 +10,13 @@ from rag.vector_store import add_chunks, search
 from rag.llm import generate_answer
 
 app = FastAPI(title="AI Codebase Assistant")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def repo_id_from_url(repo_url: str) -> str:

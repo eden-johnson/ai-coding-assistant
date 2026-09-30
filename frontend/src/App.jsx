@@ -1,6 +1,8 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import "./App.css";
 
 const API_URL = "http://localhost:8000";
@@ -10,6 +12,7 @@ function App() {
   const [question, setQuestion] = useState("");
 
   const [indexResult, setIndexResult] = useState(null);
+  const [indexedRepoUrl, setIndexedRepoUrl] = useState("");
   const [answer, setAnswer] = useState("");
   const [sources, setSources] = useState([]);
 
@@ -47,6 +50,7 @@ function App() {
       }
 
       setIndexResult(data);
+      setIndexedRepoUrl(repoUrl);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -170,10 +174,16 @@ function App() {
           <button
             className="primary-button ask-button"
             onClick={askQuestion}
-            disabled={isAsking}
+            disabled={isAsking || repoUrl !== indexedRepoUrl}
           >
             {isAsking ? "Analyzing Codebase..." : "Ask Assistant"}
           </button>
+
+          {repoUrl !== indexedRepoUrl && repoUrl.trim() && (
+            <p className="hint-text">
+              Index this repository before asking a question.
+            </p>
+          )}
         </section>
 
         {error && <div className="error-box">{error}</div>}
@@ -186,7 +196,28 @@ function App() {
             </div>
 
             <div className="answer">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>  
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code({ inline, className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || "");
+                    return !inline && match ? (
+                      <SyntaxHighlighter
+                        style={oneDark}
+                        language={match[1]}
+                        PreTag="div"
+                        {...props}
+                      >
+                        {String(children).replace(/\n$/, "")}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    );
+                  },
+                }}
+              >
                 {answer}
               </ReactMarkdown>
             </div>

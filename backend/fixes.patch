@@ -1,0 +1,89 @@
+diff --git a/backend/main.py b/backend/main.py
+index 8f04110..a7f8690 100644
+--- a/backend/main.py
++++ b/backend/main.py
+@@ -1,4 +1,5 @@
+ from fastapi import FastAPI
++from fastapi.middleware.cors import CORSMiddleware
+ from pydantic import BaseModel
+ 
+ from ingestion.github import clone_repository, cleanup_repository
+@@ -10,6 +11,13 @@ from rag.llm import generate_answer
+ 
+ app = FastAPI(title="AI Codebase Assistant")
+ 
++app.add_middleware(
++    CORSMiddleware,
++    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
++    allow_methods=["*"],
++    allow_headers=["*"],
++)
++
+ 
+ def repo_id_from_url(repo_url: str) -> str:
+     owner_repo = repo_url.rstrip("/").split("github.com/")[-1]
+diff --git a/backend/rag/vector_store.py b/backend/rag/vector_store.py
+index 20929be..5c3479a 100644
+--- a/backend/rag/vector_store.py
++++ b/backend/rag/vector_store.py
+@@ -24,13 +24,27 @@ def get_collection(repo_id: str):
+     return client.get_or_create_collection(name=repo_id)
+ 
+ 
++def reset_collection(repo_id: str) -> None:
++    """
++    Deletes the repo's collection if it exists, so re-indexing starts clean.
++    Prevents duplicate-ID collisions and stale chunks from deleted/changed files.
++    """
++    try:
++        client.delete_collection(name=repo_id)
++    except Exception:
++        # Collection didn't exist yet (first index) - nothing to delete.
++        pass
++
++
+ def add_chunks(repo_id: str, chunks: list[dict], embeddings: list[list[float]]) -> None:
+     """
+-    Stores chunks + their embeddings in the repo's collection.
++    Replaces the repo's collection with the given chunks + embeddings.
++    Any previously indexed data for this repo is wiped first.
+ 
+     chunks: [{"content", "file", "language", "start_line", "end_line"}, ...]
+     embeddings: matching list of vectors, same order as chunks
+     """
++    reset_collection(repo_id)
+     collection = get_collection(repo_id)
+ 
+     # ChromaDB wants four parallel lists, all the same length and order:
+diff --git a/backend/requirements.txt b/backend/requirements.txt
+index 3f1f365..7ea0bd5 100644
+--- a/backend/requirements.txt
++++ b/backend/requirements.txt
+@@ -1,15 +1,15 @@
+-# --- already used (Stage 1: clone + scan) ---
+-gitpython           # clone GitHub repos locally
++# Ingestion
++gitpython
+ 
+-# --- coming next: chunking + embeddings + vector DB ---
+-chromadb             # vector database — stores code embeddings, does similarity search
+-tiktoken             # counts tokens so chunks stay under the LLM's context limit
++# Embeddings + vector DB
++sentence-transformers
++chromadb
+ 
+-# --- coming next: RAG answer generation ---
+-openai               # embedding model + LLM calls (swap for `anthropic` if you use Claude instead)
+-python-dotenv        # loads your API key from a .env file instead of hardcoding it
++# LLM
++groq
++python-dotenv
+ 
+-# --- coming next: FastAPI backend (Stage 7) ---
+-fastapi              # web framework — exposes /index and /ask as HTTP endpoints
+-uvicorn[standard]    # ASGI server that actually runs FastAPI
+-pydantic             # request/response validation (FastAPI uses this under the hood)
++# API server
++fastapi
++uvicorn[standard]
++pydantic
