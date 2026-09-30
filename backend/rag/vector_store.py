@@ -12,7 +12,9 @@ import chromadb
 # PersistentClient writes to disk (./chroma_db) so the index survives
 # between runs — you don't want to re-embed the whole repo every time
 # someone restarts the server. (This folder is in .gitignore already.)
-client = chromadb.PersistentClient(path="./chroma_db")
+client = chromadb.PersistentClient(path="./chroma_db",settings=chromadb.Settings(
+        anonymized_telemetry=False
+    ))
 
 
 def get_collection(repo_id: str):

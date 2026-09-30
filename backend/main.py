@@ -6,8 +6,11 @@ from ingestion.github import clone_repository, cleanup_repository
 from ingestion.file_loader import scan_repository
 from ingestion.chunker import chunk_files
 from rag.embeddings import get_embeddings, get_embedding
+from rag.embeddings import create_embeddings
 from rag.vector_store import add_chunks, search
 from rag.llm import generate_answer
+
+embeddings = create_embeddings(chunk_files)
 
 app = FastAPI(title="AI Codebase Assistant")
 
